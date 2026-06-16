@@ -1,0 +1,42 @@
+{
+  "name": "retry-x",
+  "version": "1.0.0",
+  "description": "Zero-dependency retry mechanism library for Node.js with multiple strategies and backoff algorithms",
+  "type": "module",
+  "main": "dist/retry-x.cjs",
+  "module": "dist/retry-x.esm.js",
+  "types": "dist/retry-x.d.ts",
+  "bin": {
+    "retry-x": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "npm run clean && npm run compile && npm run test",
+    "clean": "rm -rf dist/",
+    "compile": "tsc",
+    "test": "node --test dist/tests/*.test.js",
+    "prepublishOnly": "npm run build",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "retry",
+    "retries",
+    "backoff",
+    "exponential-backoff",
+    "circuit-breaker",
+    "resilience",
+    "fault-tolerance",
+    "node",
+    "typescript",
+    "zero-dependency"
+  ],
+  "author": "Sulthonzh",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ]
+}
