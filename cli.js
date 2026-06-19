@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 'use strict';
 
-import { retry, exponentialBackoff, fullJitter, equalJitter, decorrelatedJitter, linearBackoff, constantBackoff } from './index.js';
+import { retry, exponentialBackoff, fullJitter, equalJitter, decorrelatedJitter, linearBackoff, constantBackoff, VERSION } from './index.js';
 
 function usage() {
   console.log(`
-retry-x — retry commands with backoff
+retry-x v${VERSION} — retry commands with backoff
 
 USAGE
   retry-x [options] -- <command> [args...]
@@ -17,12 +17,15 @@ OPTIONS
   -M, --max-delay <ms>      Max delay cap (default: Infinity)
   -T, --max-total <ms>      Total time budget (default: Infinity)
   -t, --timeout <ms>        Per-try timeout (default: 0 = off)
-  -s, --strategy <name>     backoff|full-jitter|equal-jitter|decorrelated|linear|constant
+  -s, --strategy <name>     exponential|full-jitter|equal-jitter|decorrelated|linear|constant
   -v, --verbose             Print retry attempts
+  -V, --version             Print version and exit
+  -h, --help                Show this help
 
 EXAMPLES
   retry-x -n 5 -s full-jitter -- curl -s https://api.example.com
   retry-x -n 3 -t 2000 -- node worker.js
+  retry-x -n 10 -s decorrelated -v -- npm run build
 `);
 }
 
@@ -48,18 +51,19 @@ function parseArgs(argv) {
     }
     if (arg === '--') { inCmd = true; continue; }
     switch (arg) {
-      case '-n': case '--retries': opts.retries = parseInt(argv[++i]); break;
-      case '-b': case '--base': opts.base = parseInt(argv[++i]); break;
+      case '-n': case '--retries': opts.retries = parseInt(argv[++i], 10); break;
+      case '-b': case '--base': opts.base = parseInt(argv[++i], 10); break;
       case '-m': case '--multiplier': opts.multiplier = parseFloat(argv[++i]); break;
-      case '-M': case '--max-delay': opts.maxDelay = parseInt(argv[++i]); break;
-      case '-T': case '--max-total': opts.maxTotal = parseInt(argv[++i]); break;
-      case '-t': case '--timeout': opts.timeout = parseInt(argv[++i]); break;
+      case '-M': case '--max-delay': opts.maxDelay = parseInt(argv[++i], 10); break;
+      case '-T': case '--max-total': opts.maxTotal = parseInt(argv[++i], 10); break;
+      case '-t': case '--timeout': opts.timeout = parseInt(argv[++i], 10); break;
       case '-s': case '--strategy': opts.strategy = argv[++i]; break;
       case '-v': case '--verbose': opts.verbose = true; break;
-      case '-h': case '--help': usage(); process.exit(0);
+      case '-V': case '--version': console.log(VERSION); process.exit(0); break;
+      case '-h': case '--help': usage(); process.exit(0); break;
       default:
-        // If it looks like a flag we don't know, skip
-        break;
+        console.error(`retry-x: unknown option '${arg}'. Use -h for help.`);
+        process.exit(2);
     }
   }
 
@@ -87,7 +91,6 @@ async function main() {
 
   const { spawn } = await import('child_process');
 
-  let attempt = 0;
   const fn = async () => {
     const exitCode = await new Promise((resolve, reject) => {
       const child = spawn(cmd[0], cmd.slice(1), { stdio: 'inherit' });

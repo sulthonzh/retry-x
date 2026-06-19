@@ -6,6 +6,8 @@
  * Exponential backoff, linear backoff, constant delay, decorrelated jitter,
  * full/decorrelated/equal jitter, per-retry timeout, max retry time budget,
  * retry-if predicates, onRetry hook, async support throughout.
+ *
+ * @version 1.1.0
  */
 
 // ─── Backoff Strategies ────────────────────────────────────────────
@@ -16,6 +18,7 @@
  * @param {number} opts.base=100 — base delay in ms
  * @param {number} opts.multiplier=2 — growth factor
  * @param {number} opts.maxDelay=Infinity — cap
+ * @returns {function(number): number}
  */
 function exponentialBackoff({ base = 100, multiplier = 2, maxDelay = Infinity } = {}) {
   return (attempt) => {
@@ -26,6 +29,11 @@ function exponentialBackoff({ base = 100, multiplier = 2, maxDelay = Infinity } 
 
 /**
  * Linear backoff: delay = base + step * attempt capped at maxDelay.
+ * @param {object} opts
+ * @param {number} opts.base=100 — starting delay
+ * @param {number} opts.step=100 — increment per attempt
+ * @param {number} opts.maxDelay=Infinity — cap
+ * @returns {function(number): number}
  */
 function linearBackoff({ base = 100, step = 100, maxDelay = Infinity } = {}) {
   return (attempt) => Math.min(base + step * attempt, maxDelay);
@@ -33,6 +41,9 @@ function linearBackoff({ base = 100, step = 100, maxDelay = Infinity } = {}) {
 
 /**
  * Constant delay: same every time.
+ * @param {object} opts
+ * @param {number} opts.delay=1000 — fixed delay in ms
+ * @returns {function(number): number}
  */
 function constantBackoff({ delay = 1000 } = {}) {
   return () => delay;
@@ -41,6 +52,11 @@ function constantBackoff({ delay = 1000 } = {}) {
 /**
  * Full jitter: random between 0 and exponential delay.
  * Recommended by AWS Architecture Blog.
+ * @param {object} opts
+ * @param {number} opts.base=100
+ * @param {number} opts.multiplier=2
+ * @param {number} opts.maxDelay=Infinity
+ * @returns {function(number): number}
  */
 function fullJitter({ base = 100, multiplier = 2, maxDelay = Infinity } = {}) {
   const exp = exponentialBackoff({ base, multiplier, maxDelay });
@@ -52,6 +68,8 @@ function fullJitter({ base = 100, multiplier = 2, maxDelay = Infinity } = {}) {
 
 /**
  * Equal jitter: half fixed + half random. Provides a floor.
+ * @param {object} opts
+ * @returns {function(number): number}
  */
 function equalJitter({ base = 100, multiplier = 2, maxDelay = Infinity } = {}) {
   const exp = exponentialBackoff({ base, multiplier, maxDelay });
@@ -62,13 +80,23 @@ function equalJitter({ base = 100, multiplier = 2, maxDelay = Infinity } = {}) {
 }
 
 /**
- * Decorrelated jitter: delay = min(maxDelay, random(base, prev * 3)).
+ * Decorrelated jitter: delay = min(maxDelay, random between base and prev * 3).
  * Prevents synchronization thundering herds better than other strategies.
+ *
+ * Note: Each instance maintains its own state. Create a new instance per
+ * retry chain (do not share across concurrent retries).
+ *
+ * @param {object} opts
+ * @param {number} opts.base=100
+ * @param {number} opts.maxDelay=Infinity
+ * @returns {function(number): number}
  */
 function decorrelatedJitter({ base = 100, maxDelay = Infinity } = {}) {
   let prev = base;
   return () => {
-    const next = Math.min(maxDelay, base + Math.random() * (prev * 3 - base));
+    const min = base;
+    const max = prev * 3;
+    const next = Math.min(maxDelay, min + Math.random() * (max - min));
     prev = next;
     return next;
   };
@@ -76,7 +104,7 @@ function decorrelatedJitter({ base = 100, maxDelay = Infinity } = {}) {
 
 // ─── Sleep helpers ─────────────────────────────────────────────────
 
-/** Promise-based sleep. */
+/** Promise-based sleep. Negative or zero resolves immediately. */
 function sleep(ms) {
   if (ms <= 0) return Promise.resolve();
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -177,7 +205,7 @@ async function retry(fn, opts = {}) {
  * Rejects a promise if it doesn't resolve within timeoutMs.
  * @param {Promise} promise
  * @param {number} timeoutMs
- * @param {string} [message='Operation timed out']
+ * @param {string} [message] — custom timeout message
  * @returns {Promise}
  */
 function withTimeout(promise, timeoutMs, message = `Operation timed out after ${timeoutMs}ms`) {
@@ -250,10 +278,16 @@ function debounce(fn, waitMs) {
     if (timer) {
       clearTimeout(timer);
       timer = null;
-      const result = await fn(...args);
-      lastResolve?.(result);
-      return result;
+      try {
+        const result = await fn(...args);
+        lastResolve?.(result);
+        return result;
+      } catch (err) {
+        lastReject?.(err);
+        throw err;
+      }
     }
+    return undefined;
   };
 
   return debounced;
@@ -274,6 +308,7 @@ function throttle(fn, waitMs) {
   let timer = null;
   let lastArgs = null;
   let pending = false;
+  let trailingResolve = null;
 
   const throttled = function (...args) {
     const now = Date.now();
@@ -282,25 +317,32 @@ function throttle(fn, waitMs) {
     if (remaining <= 0) {
       lastCall = now;
       lastArgs = null;
-      return fn(...args);
+      return Promise.resolve(fn(...args));
     }
 
     // Schedule trailing call
     lastArgs = args;
     if (!timer) {
       pending = true;
+      trailingResolve = null;
       timer = setTimeout(() => {
         timer = null;
         if (pending && lastArgs) {
           lastCall = Date.now();
           pending = false;
-          fn(...lastArgs);
+          const result = fn(...lastArgs);
           lastArgs = null;
+          if (trailingResolve) {
+            Promise.resolve(result).then(trailingResolve);
+          }
         }
       }, remaining);
     }
 
-    return Promise.resolve();
+    // Return a promise that resolves when the trailing call completes
+    return new Promise((resolve) => {
+      trailingResolve = resolve;
+    });
   };
 
   throttled.cancel = () => {
@@ -309,6 +351,7 @@ function throttle(fn, waitMs) {
       timer = null;
       pending = false;
       lastArgs = null;
+      trailingResolve = null;
     }
   };
 
@@ -332,6 +375,10 @@ function delay(ms, opts = {}) {
   });
 }
 
+// ─── Version ───────────────────────────────────────────────────────
+
+const VERSION = '1.1.0';
+
 // ─── Exports ───────────────────────────────────────────────────────
 
 export {
@@ -347,6 +394,7 @@ export {
   fullJitter,
   equalJitter,
   decorrelatedJitter,
+  VERSION,
 };
 
 export default {
@@ -362,4 +410,5 @@ export default {
   fullJitter,
   equalJitter,
   decorrelatedJitter,
+  VERSION,
 };
