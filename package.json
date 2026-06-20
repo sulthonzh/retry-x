@@ -11,7 +11,9 @@
     },
     "./cli.js": "./cli.js"
   },
-  "bin": { "retry-x": "cli.js" },
+  "bin": {
+    "retry-x": "cli.js"
+  },
   "files": [
     "index.js",
     "cli.js",
@@ -19,13 +21,32 @@
     "CHANGELOG.md",
     "LICENSE"
   ],
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "test": "node test.js",
     "test:core": "node --test --test-name-pattern='retry|backoff|timeout|jitter|debounce|throttle|delay|sleep' test.js"
   },
-  "keywords": ["retry", "backoff", "exponential", "jitter", "timeout", "circuit-breaker", "zero-dependency", "throttle", "debounce"],
+  "keywords": [
+    "retry",
+    "backoff",
+    "exponential",
+    "jitter",
+    "timeout",
+    "circuit-breaker",
+    "zero-dependency",
+    "throttle",
+    "debounce"
+  ],
   "license": "MIT",
   "author": "sulthonzh",
-  "repository": { "type": "git", "url": "https://github.com/sulthonzh/retry-x" }
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sulthonzh/retry-x"
+  },
+  "homepage": "https://github.com/sulthonzh/retry-x",
+  "bugs": {
+    "url": "https://github.com/sulthonzh/retry-x/issues"
+  }
 }
