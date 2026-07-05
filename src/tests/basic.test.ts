@@ -84,10 +84,7 @@ describe('retry-x - Basic Functionality', () => {
     try {
       await retry(async () => {
         callCount++;
-        if (callCount < 3) {
-          throw new Error('Failed');
-        }
-        return 'success';
+        throw new Error('Failed');
       }, {
         maxAttempts: 3,
         delay: 200,
@@ -100,6 +97,7 @@ describe('retry-x - Basic Functionality', () => {
       // Fixed backoff should have same delay each time
       assert.equal(e.delays[0], 200);
       assert.equal(e.delays[1], 200);
+      assert.equal(callCount, 3);
     }
   });
 
@@ -109,10 +107,7 @@ describe('retry-x - Basic Functionality', () => {
     try {
       await retry(async () => {
         callCount++;
-        if (callCount < 4) {
-          throw new Error('Failed');
-        }
-        return 'success';
+        throw new Error('Failed');
       }, {
         maxAttempts: 4,
         delay: 100,
@@ -127,6 +122,7 @@ describe('retry-x - Basic Functionality', () => {
       assert.equal(e.delays[0], 100);
       assert.equal(e.delays[1], 200);
       assert.equal(e.delays[2], 400);
+      assert.equal(callCount, 4);
     }
   });
 
@@ -136,10 +132,7 @@ describe('retry-x - Basic Functionality', () => {
     try {
       await retry(async () => {
         callCount++;
-        if (callCount < 4) {
-          throw new Error('Failed');
-        }
-        return 'success';
+        throw new Error('Failed');
       }, {
         maxAttempts: 4,
         delay: 100,
@@ -154,6 +147,7 @@ describe('retry-x - Basic Functionality', () => {
       assert.equal(e.delays[0], 100);
       assert.equal(e.delays[1], 200);
       assert.equal(e.delays[2], 300);
+      assert.equal(callCount, 4);
     }
   });
 
@@ -163,10 +157,7 @@ describe('retry-x - Basic Functionality', () => {
     try {
       await retry(async () => {
         callCount++;
-        if (callCount < 5) {
-          throw new Error('Failed');
-        }
-        return 'success';
+        throw new Error('Failed');
       }, {
         maxAttempts: 5,
         delay: 100,
@@ -181,6 +172,7 @@ describe('retry-x - Basic Functionality', () => {
       assert.equal(e.delays[1], 100);
       assert.equal(e.delays[2], 200);
       assert.equal(e.delays[3], 300);
+      assert.equal(callCount, 5);
     }
   });
 
@@ -190,10 +182,7 @@ describe('retry-x - Basic Functionality', () => {
     try {
       await retry(async () => {
         callCount++;
-        if (callCount < 3) {
-          throw new Error('Failed');
-        }
-        return 'success';
+        throw new Error('Failed');
       }, {
         maxAttempts: 3,
         delay: 100,
@@ -210,6 +199,7 @@ describe('retry-x - Basic Functionality', () => {
       assert.ok(delays[1]! < 100, `delay[1] ${delays[1]} should be < 100`);
       assert.ok(delays[0]! >= 0, `delay[0] ${delays[0]} should be >= 0`);
       assert.ok(delays[1]! >= 0, `delay[1] ${delays[1]} should be >= 0`);
+      assert.equal(callCount, 3);
     }
   });
 
@@ -219,10 +209,7 @@ describe('retry-x - Basic Functionality', () => {
     try {
       await retry(async () => {
         callCount++;
-        if (callCount < 5) {
-          throw new Error('Failed');
-        }
-        return 'success';
+        throw new Error('Failed');
       }, {
         maxAttempts: 5,
         delay: 1000,
@@ -239,6 +226,7 @@ describe('retry-x - Basic Functionality', () => {
       assert.equal(delays[1], 2000);
       assert.equal(delays[2], 2000);
       assert.equal(delays[3], 2000);
+      assert.equal(callCount, 5);
     }
   });
 

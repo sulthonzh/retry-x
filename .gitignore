@@ -1,3 +1,7 @@
-dist/tests/
+node_modules/
+dist/
 *.tsbuildinfo
+*.log
+.DS_Store
+coverage/
 STATUS.md

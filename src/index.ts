@@ -202,7 +202,7 @@ export async function retry<T = any>(
         
         if (shouldRetryNow) {
           try {
-            onRetry?.(i, lastError, retryDelay);
+            onRetry?.(i + 1, lastError, retryDelay);
           } catch {
             // Ignore callback errors
           }
