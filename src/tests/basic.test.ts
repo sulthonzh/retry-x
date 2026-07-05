@@ -1,5 +1,6 @@
-import { retry, RetryOptions, RetryResult, RetryError } from '../index';
-import { describe, it, expect } from 'node:test';
+import { retry, RetryError } from '../index.js';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
 describe('retry-x - Basic Functionality', () => {
   
@@ -11,11 +12,11 @@ describe('retry-x - Basic Functionality', () => {
       return { success: true, data: 'test' };
     });
 
-    expect(callCount).toBe(1);
-    expect(result.value).toEqual({ success: true, data: 'test' });
-    expect(result.stats.attempts).toBe(1);
-    expect(result.stats.success).toBe(true);
-    expect(result.stats.retries).toBe(0);
+    assert.equal(callCount, 1);
+    assert.deepEqual(result.value, { success: true, data: 'test' });
+    assert.equal(result.stats.attempts, 1);
+    assert.equal(result.stats.success, true);
+    assert.equal(result.stats.retries, 0);
   });
 
   it('should retry and succeed on second attempt', async () => {
@@ -29,38 +30,38 @@ describe('retry-x - Basic Functionality', () => {
       return { success: true, data: 'retry success' };
     });
 
-    expect(callCount).toBe(2);
-    expect(result.value).toEqual({ success: true, data: 'retry success' });
-    expect(result.stats.attempts).toBe(2);
-    expect(result.stats.success).toBe(true);
-    expect(result.stats.retries).toBe(1);
+    assert.equal(callCount, 2);
+    assert.deepEqual(result.value, { success: true, data: 'retry success' });
+    assert.equal(result.stats.attempts, 2);
+    assert.equal(result.stats.success, true);
+    assert.equal(result.stats.retries, 1);
   });
 
   it('should exhaust max attempts and throw error', async () => {
     let callCount = 0;
     
-    try {
+    await assert.rejects(async () => {
       await retry(async () => {
         callCount++;
         throw new Error(`Attempt ${callCount} failed`);
       }, {
         maxAttempts: 3
       });
-      
-      expect.fail('Should have thrown error');
-    } catch (error) {
-      expect(error).toBeInstanceOf(RetryError);
-      expect((error as RetryError).attempt).toBe(3);
-      expect((error as RetryError).totalAttempts).toBe(3);
-      expect(callCount).toBe(3);
-    }
+    }, (error: unknown) => {
+      assert.ok(error instanceof RetryError);
+      const e = error as RetryError;
+      assert.equal(e.attempt, 3);
+      assert.equal(e.totalAttempts, 3);
+      return true;
+    });
+    assert.equal(callCount, 3);
   });
 
   it('should respect custom delay between retries', async () => {
     let callCount = 0;
     const startTime = Date.now();
     
-    try {
+    await assert.rejects(async () => {
       await retry(async () => {
         callCount++;
         throw new Error('Failed');
@@ -68,21 +69,17 @@ describe('retry-x - Basic Functionality', () => {
         maxAttempts: 3,
         delay: 500
       });
-    } catch (error) {
-      const endTime = Date.now();
-      const totalTime = endTime - startTime;
-      
-      // Should be approximately 1000ms (2 retries * 500ms delay)
-      expect(totalTime).toBeGreaterThan(900);
-      expect(totalTime).toBeLessThan(1200);
-      expect(callCount).toBe(3);
-    }
+    });
+    
+    const totalTime = Date.now() - startTime;
+    // Should be approximately 1000ms (2 retries * 500ms delay)
+    assert.ok(totalTime > 900, `totalTime ${totalTime} should be > 900`);
+    assert.ok(totalTime < 1200, `totalTime ${totalTime} should be < 1200`);
+    assert.equal(callCount, 3);
   });
 
   it('should use fixed backoff strategy', async () => {
     let callCount = 0;
-    const startTime = Date.now();
-    const delays: number[] = [];
     
     try {
       await retry(async () => {
@@ -96,20 +93,18 @@ describe('retry-x - Basic Functionality', () => {
         delay: 200,
         backoff: 'fixed'
       });
-    } catch (error) {
-      delays.push((error as RetryError).delays[0]);
-      delays.push((error as RetryError).delays[1]);
-      
+      assert.fail('Should have thrown');
+    } catch (error: unknown) {
+      assert.ok(error instanceof RetryError);
+      const e = error as RetryError;
       // Fixed backoff should have same delay each time
-      expect(delays[0]).toBe(200);
-      expect(delays[1]).toBe(200);
+      assert.equal(e.delays[0], 200);
+      assert.equal(e.delays[1], 200);
     }
   });
 
   it('should use exponential backoff strategy', async () => {
     let callCount = 0;
-    const startTime = Date.now();
-    const delays: number[] = [];
     
     try {
       await retry(async () => {
@@ -124,19 +119,19 @@ describe('retry-x - Basic Functionality', () => {
         backoff: 'exponential',
         maxDelay: 1000
       });
-    } catch (error) {
-      delays.push(...(error as RetryError).delays);
-      
-      // Exponential backoff: 100, 200, 400, then capped at maxDelay
-      expect(delays[0]).toBe(100);
-      expect(delays[1]).toBe(200);
-      expect(delays[2]).toBe(400);
+      assert.fail('Should have thrown');
+    } catch (error: unknown) {
+      assert.ok(error instanceof RetryError);
+      const e = error as RetryError;
+      // Exponential backoff: 100, 200, 400
+      assert.equal(e.delays[0], 100);
+      assert.equal(e.delays[1], 200);
+      assert.equal(e.delays[2], 400);
     }
   });
 
   it('should use linear backoff strategy', async () => {
     let callCount = 0;
-    const delays: number[] = [];
     
     try {
       await retry(async () => {
@@ -151,19 +146,19 @@ describe('retry-x - Basic Functionality', () => {
         backoff: 'linear',
         maxDelay: 500
       });
-    } catch (error) {
-      delays.push(...(error as RetryError).delays);
-      
-      // Linear backoff: 100, 200, 300, 400
-      expect(delays[0]).toBe(100);
-      expect(delays[1]).toBe(200);
-      expect(delays[2]).toBe(300);
+      assert.fail('Should have thrown');
+    } catch (error: unknown) {
+      assert.ok(error instanceof RetryError);
+      const e = error as RetryError;
+      // Linear backoff: 100, 200, 300
+      assert.equal(e.delays[0], 100);
+      assert.equal(e.delays[1], 200);
+      assert.equal(e.delays[2], 300);
     }
   });
 
   it('should use fibonacci backoff strategy', async () => {
     let callCount = 0;
-    const delays: number[] = [];
     
     try {
       await retry(async () => {
@@ -177,14 +172,15 @@ describe('retry-x - Basic Functionality', () => {
         delay: 100,
         backoff: 'fibonacci'
       });
-    } catch (error) {
-      delays.push(...(error as RetryError).delays);
-      
-      // Fibonacci backoff: 100, 100, 200, 300, 500
-      expect(delays[0]).toBe(100);
-      expect(delays[1]).toBe(100);
-      expect(delays[2]).toBe(200);
-      expect(delays[3]).toBe(300);
+      assert.fail('Should have thrown');
+    } catch (error: unknown) {
+      assert.ok(error instanceof RetryError);
+      const e = error as RetryError;
+      // Fibonacci backoff: 100, 100, 200, 300
+      assert.equal(e.delays[0], 100);
+      assert.equal(e.delays[1], 100);
+      assert.equal(e.delays[2], 200);
+      assert.equal(e.delays[3], 300);
     }
   });
 
@@ -204,20 +200,21 @@ describe('retry-x - Basic Functionality', () => {
         backoff: 'fixed',
         jitter: true
       });
-    } catch (error) {
+      assert.fail('Should have thrown');
+    } catch (error: unknown) {
+      assert.ok(error instanceof RetryError);
       const delays = (error as RetryError).delays;
       
       // With jitter, delays should be different (usually less than base delay)
-      expect(delays[0]).toBeLessThan(100);
-      expect(delays[1]).toBeLessThan(100);
-      expect(delays[0]).toBeGreaterThanOrEqual(0);
-      expect(delays[1]).toBeGreaterThanOrEqual(0);
+      assert.ok(delays[0]! < 100, `delay[0] ${delays[0]} should be < 100`);
+      assert.ok(delays[1]! < 100, `delay[1] ${delays[1]} should be < 100`);
+      assert.ok(delays[0]! >= 0, `delay[0] ${delays[0]} should be >= 0`);
+      assert.ok(delays[1]! >= 0, `delay[1] ${delays[1]} should be >= 0`);
     }
   });
 
   it('should respect maxDelay limit', async () => {
     let callCount = 0;
-    const delays: number[] = [];
     
     try {
       await retry(async () => {
@@ -232,14 +229,16 @@ describe('retry-x - Basic Functionality', () => {
         backoff: 'exponential',
         maxDelay: 2000
       });
-    } catch (error) {
-      delays.push(...(error as RetryError).delays);
+      assert.fail('Should have thrown');
+    } catch (error: unknown) {
+      assert.ok(error instanceof RetryError);
+      const delays = (error as RetryError).delays;
       
       // Should be capped at maxDelay: 1000, 2000, 2000, 2000
-      expect(delays[0]).toBe(1000);
-      expect(delays[1]).toBe(2000);
-      expect(delays[2]).toBe(2000);
-      expect(delays[3]).toBe(2000);
+      assert.equal(delays[0], 1000);
+      assert.equal(delays[1], 2000);
+      assert.equal(delays[2], 2000);
+      assert.equal(delays[3], 2000);
     }
   });
 
@@ -251,8 +250,8 @@ describe('retry-x - Basic Functionality', () => {
       return Promise.resolve({ success: true, count: callCount });
     });
 
-    expect(callCount).toBe(1);
-    expect(result.value).toEqual({ success: true, count: 1 });
+    assert.equal(callCount, 1);
+    assert.deepEqual(result.value, { success: true, count: 1 });
   });
 
   it('should provide correct retry statistics', async () => {
@@ -266,10 +265,10 @@ describe('retry-x - Basic Functionality', () => {
       return { success: true, data: 'retry success' };
     });
 
-    expect(result.stats.attempts).toBe(2);
-    expect(result.stats.retries).toBe(1);
-    expect(result.stats.success).toBe(true);
-    expect(result.stats.delays).toHaveLength(1);
-    expect(result.stats.delays[0]).toBe(1000); // default delay
+    assert.equal(result.stats.attempts, 2);
+    assert.equal(result.stats.retries, 1);
+    assert.equal(result.stats.success, true);
+    assert.equal(result.stats.delays.length, 1);
+    assert.equal(result.stats.delays[0], 1000); // default delay
   });
 });

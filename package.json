@@ -10,9 +10,10 @@
     "retry-x": "dist/cli/index.js"
   },
   "scripts": {
-    "build": "npm run clean && npm run compile && npm run test",
+    "build": "npm run clean && npm run compile",
     "clean": "rm -rf dist/",
     "compile": "tsc",
+    "pretest": "npm run build",
     "test": "node --test dist/tests/*.test.js",
     "prepublishOnly": "npm run build",
     "dev": "tsc --watch"
@@ -38,5 +39,12 @@
     "dist/",
     "README.md",
     "LICENSE"
-  ]
+  ],
+  "devDependencies": {
+    "@types/commander": "^2.12.0",
+    "@types/node": "^26.1.0"
+  },
+  "dependencies": {
+    "commander": "^15.0.0"
+  }
 }

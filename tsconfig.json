@@ -24,7 +24,8 @@
     "allowUnusedLabels": false,
     "allowUnreachableCode": false,
     "exactOptionalPropertyTypes": true,
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
+    "module": "NodeNext",
     "baseUrl": ".",
     "paths": {
       "*": ["./src/*"]
@@ -35,8 +36,6 @@
   ],
   "exclude": [
     "node_modules",
-    "dist",
-    "**/*.test.ts",
-    "**/*.spec.ts"
+    "dist"
   ]
 }

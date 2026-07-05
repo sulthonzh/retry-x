@@ -151,7 +151,11 @@ export async function retry<T = any>(
     attempt = attemptNumber;
     const attemptStartTime = Date.now();
 
-    onAttempt?.(attempt, lastError);
+    try {
+      onAttempt?.(attempt, lastError);
+    } catch {
+      // Ignore callback errors
+    }
 
     // Handle timeout for this attempt
     if (timeout) {
@@ -197,7 +201,11 @@ export async function retry<T = any>(
         const shouldRetryNow = retryOn(i, lastError) && shouldRetry(lastError);
         
         if (shouldRetryNow) {
-          onRetry?.(i, lastError, retryDelay);
+          try {
+            onRetry?.(i, lastError, retryDelay);
+          } catch {
+            // Ignore callback errors
+          }
           
           // Wait before retrying
           await new Promise(resolve => setTimeout(resolve, retryDelay));

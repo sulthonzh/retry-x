@@ -51,7 +51,11 @@ export async function retry(fn, options = {}) {
     const executeAttempt = async (attemptNumber) => {
         attempt = attemptNumber;
         const attemptStartTime = Date.now();
-        onAttempt?.(attempt, lastError);
+        try {
+            onAttempt?.(attempt, lastError);
+        }
+        catch {
+        }
         if (timeout) {
             const timeoutPromise = new Promise((_, reject) => {
                 setTimeout(() => {
@@ -87,7 +91,11 @@ export async function retry(fn, options = {}) {
                 delays.push(retryDelay);
                 const shouldRetryNow = retryOn(i, lastError) && shouldRetry(lastError);
                 if (shouldRetryNow) {
-                    onRetry?.(i, lastError, retryDelay);
+                    try {
+                        onRetry?.(i, lastError, retryDelay);
+                    }
+                    catch {
+                    }
                     await new Promise(resolve => setTimeout(resolve, retryDelay));
                 }
                 else {

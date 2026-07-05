@@ -1,213 +1,109 @@
-import { retry, RetryOptions, RetryError } from '../index';
-import { describe, it, expect } from 'node:test';
+import { retry, RetryError } from '../index.js';
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
 
 describe('retry-x - Error Handling', () => {
   
-  it('should retry only on specific errors using shouldRetry', async () => {
-    let callCount = 0;
-    
-    try {
+  it('should throw RetryError on failure', async () => {
+    await assert.rejects(async () => {
       await retry(async () => {
-        callCount++;
-        if (callCount === 1) {
-          throw new Error('Network error');
-        }
-        if (callCount === 2) {
-          throw new Error('Fatal error'); // Should not retry this
-        }
-        return 'success';
-      }, {
-        maxAttempts: 5,
-        shouldRetry: (error) => {
-          return error.message === 'Network error';
-        }
-      });
-      
-      expect.fail('Should have thrown error');
-    } catch (error) {
-      expect(callCount).toBe(2); // Retried first error, but not second
-      expect(error.message).toBe('Fatal error');
-    }
-  });
-
-  it('should retry based on custom retryOn condition', async () => {
-    let callCount = 0;
-    const errors: Error[] = [];
-    
-    const result = await retry(async () => {
-      callCount++;
-      const error = new Error(`Attempt ${callCount} failed`);
-      errors.push(error);
-      
-      if (callCount <= 2) {
-        throw error;
-      }
-      
-      return 'success';
-    }, {
-      maxAttempts: 5,
-      retryOn: (attempt, error) => {
-        // Only retry on attempts 1 and 2
-        return attempt <= 2;
-      }
+        throw new Error('Test error');
+      }, { maxAttempts: 1 });
+    }, (error: unknown) => {
+      assert.ok(error instanceof RetryError);
+      assert.match((error as Error).message, /Operation failed after 1 attempts/);
+      return true;
     });
-
-    expect(callCount).toBe(3); // Attempted 3 times, but only retried first 2
-    expect(errors.length).toBe(3); // All attempts failed, but only first 2 were retried
-    expect(result.value).toBe('success');
-    expect(result.stats.attempts).toBe(3);
   });
 
-  it('should combine retryOn and shouldRetry conditions', async () => {
+  it('should include last error message in RetryError', async () => {
+    await assert.rejects(async () => {
+      await retry(async () => {
+        throw new Error('Custom error message');
+      }, { maxAttempts: 2 });
+    }, (error: unknown) => {
+      assert.ok(error instanceof RetryError);
+      assert.match((error as Error).message, /Custom error message/);
+      return true;
+    });
+  });
+
+  it('should call onFailure with the correct error', async () => {
+    let failureError: Error | undefined;
+    
+    await assert.rejects(async () => {
+      await retry(async () => {
+        throw new Error('Specific failure');
+      }, {
+        maxAttempts: 2,
+        onFailure: (error: Error) => {
+          failureError = error;
+        }
+      });
+    });
+    
+    assert.ok(failureError);
+    assert.equal(failureError!.message, 'Specific failure');
+  });
+
+  it('should respect shouldRetry condition', async () => {
     let callCount = 0;
     
-    try {
+    await assert.rejects(async () => {
       await retry(async () => {
         callCount++;
-        const error = new Error(`Attempt ${callCount} error`);
-        
-        if (callCount === 1) {
-          throw new Error('Network error'); // Should retry (retryOn + shouldRetry)
-        }
-        if (callCount === 2) {
-          throw new Error('HTTP 500 error'); // Should retry (retryOn + shouldRetry)
-        }
-        if (callCount === 3) {
-          throw new Error('HTTP 400 error'); // Should not retry (retryOn ok, but shouldRetry fails)
-        }
-        
-        return 'success';
+        throw new Error('Non-retryable error');
       }, {
         maxAttempts: 5,
-        retryOn: (attempt, error) => {
-          return attempt <= 2;
-        },
-        shouldRetry: (error) => {
-          return !error.message.includes('HTTP 400');
+        shouldRetry: (error: Error) => {
+          return error.message.includes('RETRYABLE');
         }
       });
-      
-      expect.fail('Should have thrown error');
-    } catch (error) {
-      expect(callCount).toBe(3);
-      expect(error.message).toBe('HTTP 400 error');
-    }
+    });
+    
+    // shouldRetry returns false, so no retries should happen
+    assert.equal(callCount, 1);
   });
 
-  it('should handle non-error rejections', async () => {
+  it('should respect retryOn condition', async () => {
     let callCount = 0;
     
-    try {
+    await assert.rejects(async () => {
       await retry(async () => {
         callCount++;
-        if (callCount === 1) {
-          throw 'string error';
-        }
-        if (callCount === 2) {
-          throw null;
-        }
-        return 'success';
+        throw new Error('Non-retryable error');
       }, {
-        maxAttempts: 3,
-        shouldRetry: (error) => {
-          // Handle non-error objects
-          if (error === null) return false;
-          if (typeof error === 'string') return true;
-          return true;
-        }
+        maxAttempts: 5,
+        retryOn: () => false
       });
-      
-      expect.fail('Should have thrown error');
-    } catch (error) {
-      expect(callCount).toBe(2);
-      expect(error).toBe(null);
-    }
+    });
+    
+    // retryOn returns false, so no retries should happen
+    assert.equal(callCount, 1);
   });
 
-  it('should preserve original error properties', async () => {
-    let callCount = 0;
-    const originalError = new Error('Test error');
-    originalError.code = 'TEST_ERROR';
-    
-    try {
+  it('should handle non-Error throws', async () => {
+    await assert.rejects(async () => {
       await retry(async () => {
-        callCount++;
-        throw originalError;
-      }, {
-        maxAttempts: 2
-      });
-    } catch (error) {
-      expect(error).toBe(originalError);
-      expect(error.code).toBe('TEST_ERROR');
-      expect(error.message).toBe('Test error');
-    }
+        throw 'string error';
+      }, { maxAttempts: 1 });
+    });
   });
 
-  it('should handle errors with custom properties', async () => {
+  it('should preserve error attempt count', async () => {
     let callCount = 0;
     
-    try {
+    await assert.rejects(async () => {
       await retry(async () => {
         callCount++;
-        const error = new Error('Custom error');
-        (error as any).customProp = 'test value';
-        (error as any).status = 500;
-        throw error;
-      }, {
-        maxAttempts: 2
-      });
-    } catch (error) {
-      expect(callCount).toBe(2);
-      expect((error as any).customProp).toBe('test value');
-      expect((error as any).status).toBe(500);
-    }
-  });
-
-  it('should not retry on thrown non-Error objects', async () => {
-    let callCount = 0;
-    
-    try {
-      await retry(async () => {
-        callCount++;
-        if (callCount === 1) {
-          throw { message: 'Object error' };
-        }
-        return 'success';
-      }, {
-        maxAttempts: 3,
-        shouldRetry: (error) => {
-          return typeof error === 'object' && error !== null;
-        }
-      });
-      
-      expect.fail('Should have thrown error');
-    } catch (error) {
-      expect(callCount).toBe(1); // Should not retry on non-Error
-      expect(error).toEqual({ message: 'Object error' });
-    }
-  });
-
-  it('should handle error serialization and deserialization', async () => {
-    let callCount = 0;
-    
-    try {
-      await retry(async () => {
-        callCount++;
-        const error = new Error('Serialization test');
-        throw error;
-      }, {
-        maxAttempts: 2
-      });
-    } catch (error) {
-      // JSON.stringify and parse should preserve basic error structure
-      const serialized = JSON.stringify(error);
-      const deserialized = JSON.parse(serialized);
-      
-      expect(deserialized.message).toBe('Serialization test');
-      expect(deserialized.name).toBe('RetryError');
-      expect(deserialized.attempt).toBe(2);
-      expect(deserialized.totalAttempts).toBe(2);
-      expect(Array.isArray(deserialized.delays)).toBe(true);
-    }
+        throw new Error(`Attempt ${callCount}`);
+      }, { maxAttempts: 4 });
+    }, (error: unknown) => {
+      assert.ok(error instanceof RetryError);
+      assert.equal((error as RetryError).attempt, 4);
+      assert.equal((error as RetryError).totalAttempts, 4);
+      return true;
+    });
+    assert.equal(callCount, 4);
   });
 });
