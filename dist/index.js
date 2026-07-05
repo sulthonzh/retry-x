@@ -92,7 +92,7 @@ export async function retry(fn, options = {}) {
                 const shouldRetryNow = retryOn(i, lastError) && shouldRetry(lastError);
                 if (shouldRetryNow) {
                     try {
-                        onRetry?.(i, lastError, retryDelay);
+                        onRetry?.(i + 1, lastError, retryDelay);
                     }
                     catch {
                     }
