@@ -35,6 +35,8 @@ export interface RetryOptions {
   onFailure?: (error: Error, attempts: number, totalTime: number) => void;
   /** Timeout for each attempt in milliseconds */
   timeout?: number | undefined;
+  /** AbortSignal to cancel the operation */
+  signal?: AbortSignal;
 }
 
 export interface RetryResult<T = any> {
@@ -95,7 +97,8 @@ export async function retry<T = any>(
     onRetry,
     onSuccess,
     onFailure,
-    timeout
+    timeout,
+    signal
   } = options;
 
   let attempt = 0;
@@ -149,7 +152,6 @@ export async function retry<T = any>(
 
   const executeAttempt = async (attemptNumber: number): Promise<T> => {
     attempt = attemptNumber;
-    const attemptStartTime = Date.now();
 
     try {
       onAttempt?.(attempt, lastError);
@@ -183,6 +185,11 @@ export async function retry<T = any>(
   };
 
   for (let i = 1; i <= maxAttempts; i++) {
+    // Check abort signal
+    if (signal?.aborted) {
+      throw new RetryError('Operation aborted', i - 1, maxAttempts, delays);
+    }
+
     try {
       const result = await executeAttempt(i);
       const totalTime = Date.now() - startTime;

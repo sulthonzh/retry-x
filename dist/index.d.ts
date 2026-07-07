@@ -12,6 +12,7 @@ export interface RetryOptions {
     onSuccess?: (result: any, attempts: number, totalTime: number) => void;
     onFailure?: (error: Error, attempts: number, totalTime: number) => void;
     timeout?: number | undefined;
+    signal?: AbortSignal;
 }
 export interface RetryResult<T = any> {
     value: T;

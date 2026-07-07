@@ -8,7 +8,7 @@ export class RetryError extends Error {
     }
 }
 export async function retry(fn, options = {}) {
-    const { maxAttempts = 3, delay = 1000, maxDelay = 30000, backoff = 'fixed', jitter = false, jitterType = 'full', retryOn = () => true, shouldRetry = () => true, onAttempt, onRetry, onSuccess, onFailure, timeout } = options;
+    const { maxAttempts = 3, delay = 1000, maxDelay = 30000, backoff = 'fixed', jitter = false, jitterType = 'full', retryOn = () => true, shouldRetry = () => true, onAttempt, onRetry, onSuccess, onFailure, timeout, signal } = options;
     let attempt = 0;
     let startTime = Date.now();
     let lastError;
@@ -50,7 +50,6 @@ export async function retry(fn, options = {}) {
     };
     const executeAttempt = async (attemptNumber) => {
         attempt = attemptNumber;
-        const attemptStartTime = Date.now();
         try {
             onAttempt?.(attempt, lastError);
         }
@@ -77,6 +76,9 @@ export async function retry(fn, options = {}) {
         return await fn();
     };
     for (let i = 1; i <= maxAttempts; i++) {
+        if (signal?.aborted) {
+            throw new RetryError('Operation aborted', i - 1, maxAttempts, delays);
+        }
         try {
             const result = await executeAttempt(i);
             const totalTime = Date.now() - startTime;

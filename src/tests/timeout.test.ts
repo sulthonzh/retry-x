@@ -1,6 +1,28 @@
-import { retry } from '../index.js';
-import { describe, it } from 'node:test';
+import { retry, RetryError } from '../index.js';
+import { describe, it, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
+
+// Track timers so we can clean them up to prevent test runner hangs.
+// When timeout fires via Promise.race, the underlying fn() promise keeps
+// running in the background. We must clean up those lingering timers.
+const pendingTimers: NodeJS.Timeout[] = [];
+
+function trackTimer(timer: NodeJS.Timeout): NodeJS.Timeout {
+  pendingTimers.push(timer);
+  return timer;
+}
+
+function cleanupTimers(): void {
+  for (const timer of pendingTimers) {
+    clearTimeout(timer);
+    clearInterval(timer);
+  }
+  pendingTimers.length = 0;
+}
+
+afterEach(() => {
+  cleanupTimers();
+});
 
 describe('retry-x - Timeout Functionality', () => {
   
@@ -10,11 +32,15 @@ describe('retry-x - Timeout Functionality', () => {
     await assert.rejects(async () => {
       await retry(async () => {
         callCount++;
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Use tracked timer so it's cleaned up after test
+        await new Promise(resolve => {
+          const t = setTimeout(resolve, 2000);
+          trackTimer(t);
+        });
         return 'success';
       }, {
         maxAttempts: 2,
-        timeout: 500
+        timeout: 100
       });
     }, (error: unknown) => {
       assert.match((error as Error).message, /Operation failed after 2 attempts/);
@@ -28,7 +54,7 @@ describe('retry-x - Timeout Functionality', () => {
     
     const result = await retry(async () => {
       callCount++;
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 50));
       return 'success';
     }, {
       maxAttempts: 3,
@@ -45,12 +71,15 @@ describe('retry-x - Timeout Functionality', () => {
     await assert.rejects(async () => {
       await retry(async () => {
         callCount++;
-        await new Promise(resolve => setTimeout(resolve, 800));
+        await new Promise(resolve => {
+          const t = setTimeout(resolve, 400);
+          trackTimer(t);
+        });
         return 'success';
       }, {
         maxAttempts: 3,
-        timeout: 500,
-        delay: 100
+        timeout: 100,
+        delay: 50
       });
     });
     
@@ -65,13 +94,15 @@ describe('retry-x - Timeout Functionality', () => {
     await assert.rejects(async () => {
       await retry(async () => {
         callCount++;
-        // Always slow — both attempts will timeout
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => {
+          const t = setTimeout(resolve, 2000);
+          trackTimer(t);
+        });
         return 'success';
       }, {
         maxAttempts: 2,
-        timeout: 500,
-        delay: 100,
+        timeout: 100,
+        delay: 50,
         backoff: 'exponential'
       });
     }, (error: unknown) => {
@@ -80,10 +111,10 @@ describe('retry-x - Timeout Functionality', () => {
     });
     
     const totalTime = Date.now() - startTime;
-    // 2 timeouts (500ms each) + exponential delay (100ms) = ~1100ms
+    // 2 timeouts (100ms each) + exponential delay (50ms) = ~250ms
     assert.equal(callCount, 2);
-    assert.ok(totalTime >= 1000, `totalTime ${totalTime} should be >= 1000`);
-    assert.ok(totalTime < 1500, `totalTime ${totalTime} should be < 1500`);
+    assert.ok(totalTime >= 200, `totalTime ${totalTime} should be >= 200`);
+    assert.ok(totalTime < 600, `totalTime ${totalTime} should be < 600`);
   });
 
   it('should continue retrying after timeout', async () => {
@@ -92,14 +123,17 @@ describe('retry-x - Timeout Functionality', () => {
     const result = await retry(async () => {
       callCount++;
       if (callCount === 1) {
-        await new Promise(resolve => setTimeout(resolve, 800));
+        await new Promise(resolve => {
+          const t = setTimeout(resolve, 400);
+          trackTimer(t);
+        });
       } else {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 10));
       }
       return 'success';
     }, {
       maxAttempts: 3,
-      timeout: 500
+      timeout: 100
     });
 
     assert.equal(callCount, 2);
@@ -113,13 +147,16 @@ describe('retry-x - Timeout Functionality', () => {
     await assert.rejects(async () => {
       await retry(async () => {
         callCount++;
-        await new Promise(resolve => setTimeout(resolve, 800));
+        await new Promise(resolve => {
+          const t = setTimeout(resolve, 400);
+          trackTimer(t);
+        });
         throw new Error('Operation took too long');
       }, {
         maxAttempts: 3,
-        timeout: 500,
+        timeout: 100,
         shouldRetry: (error: Error) => {
-          return error.message === 'Operation timed out after 500ms';
+          return error.message === 'Operation timed out after 100ms';
         }
       });
     });
@@ -135,19 +172,21 @@ describe('retry-x - Timeout Functionality', () => {
     await assert.rejects(async () => {
       await retry(async () => {
         callCount++;
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise(resolve => {
+          const t = setTimeout(resolve, 2000);
+          trackTimer(t);
+        });
         return 'success';
       }, {
         maxAttempts: 2,
-        timeout: 500
+        timeout: 100
       });
     });
     
-    // Both attempts timeout (no delay between retries by default = 1000ms delay)
     assert.equal(callCount, 2);
     const totalTime = Date.now() - startTime;
-    // 2 timeouts (500ms each) + 1 default delay (1000ms) = ~2000ms
-    assert.ok(totalTime >= 1500, `totalTime ${totalTime} should be >= 1500`);
+    // 2 timeouts (100ms each) + 1 default delay (1000ms) = ~1200ms
+    assert.ok(totalTime >= 1000, `totalTime ${totalTime} should be >= 1000`);
   });
 
   it('should handle timeout with monitoring callbacks', async () => {
@@ -158,12 +197,15 @@ describe('retry-x - Timeout Functionality', () => {
       await retry(async () => {
         callCount++;
         callbackOrder.push(`start-${callCount}`);
-        await new Promise(resolve => setTimeout(resolve, 800));
+        await new Promise(resolve => {
+          const t = setTimeout(resolve, 400);
+          trackTimer(t);
+        });
         callbackOrder.push(`end-${callCount}`);
         return 'success';
       }, {
         maxAttempts: 2,
-        timeout: 500,
+        timeout: 100,
         onAttempt: (attempt: number) => {
           callbackOrder.push(`attempt-${attempt}`);
         }
@@ -173,11 +215,6 @@ describe('retry-x - Timeout Functionality', () => {
       // expected
     }
     
-    // Both attempts fire callbacks. The fn body runs synchronously up to the await,
-    // so start-N is pushed before timeout fires. end-N may or may not be pushed
-    // depending on timing (background promise completion).
-    // onAttempt fires before fn starts (per implementation: onAttempt is called at
-    // the start of executeAttempt, before fn()).
     assert.equal(callCount, 2);
     assert.ok(callbackOrder.includes('attempt-1'), 'should have attempt-1 callback');
     assert.ok(callbackOrder.includes('attempt-2'), 'should have attempt-2 callback');
@@ -192,20 +229,43 @@ describe('retry-x - Timeout Functionality', () => {
     await assert.rejects(async () => {
       await retry(async () => {
         callCount++;
-        await new Promise(resolve => setTimeout(resolve, 800));
+        await new Promise(resolve => {
+          const t = setTimeout(resolve, 400);
+          trackTimer(t);
+        });
         return 'success';
       }, {
         maxAttempts: 2,
-        timeout: 500,
-        delay: 200
+        timeout: 100,
+        delay: 100
       });
     });
     
     const totalTime = Date.now() - startTime;
     // Timeout is per-attempt; both attempts will timeout and retry continues
-    // 2 timeouts (500ms each) + 1 delay (200ms) = ~1200ms
+    // 2 timeouts (100ms each) + 1 delay (100ms) = ~300ms
     assert.equal(callCount, 2);
-    assert.ok(totalTime >= 1000, `totalTime ${totalTime} should be >= 1000`);
-    assert.ok(totalTime < 1500, `totalTime ${totalTime} should be < 1500`);
+    assert.ok(totalTime >= 250, `totalTime ${totalTime} should be >= 250`);
+    assert.ok(totalTime < 600, `totalTime ${totalTime} should be < 600`);
+  });
+
+  it('should throw RetryError with timeout info', async () => {
+    await assert.rejects(async () => {
+      await retry(async () => {
+        await new Promise(resolve => {
+          const t = setTimeout(resolve, 2000);
+          trackTimer(t);
+        });
+        return 'success';
+      }, {
+        maxAttempts: 1,
+        timeout: 50
+      });
+    }, (error: unknown) => {
+      assert.ok(error instanceof RetryError);
+      assert.match((error as Error).message, /Operation failed after 1 attempts/);
+      assert.match((error as Error).message, /Operation timed out after 50ms/);
+      return true;
+    });
   });
 });
