@@ -158,16 +158,25 @@ export async function retry<T = any>(
     }
 
     // Handle timeout for this attempt
+    // Note: JavaScript promises cannot be cancelled. When timeout fires,
+    // the operation continues in the background. The timeout timer is
+    // properly cleared to prevent timer leaks.
     if (timeout) {
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(new Error(`Operation timed out after ${timeout}ms`));
-        }, timeout);
-      });
-
-      const operationPromise = fn();
-      const result = await Promise.race([operationPromise, timeoutPromise]);
-      return result;
+      let timeoutId: NodeJS.Timeout | null = null;
+      
+      try {
+        const result = await Promise.race([
+          fn(),
+          new Promise<never>((_, reject) => {
+            timeoutId = setTimeout(() => {
+              reject(new Error(`Operation timed out after ${timeout}ms`));
+            }, timeout);
+          })
+        ]);
+        return result;
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+      }
     }
 
     return await fn();
