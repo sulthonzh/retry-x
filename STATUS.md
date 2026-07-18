@@ -2,15 +2,15 @@
 
 **Current State:** ✅ EXCEPTIONAL
 
-**Last audit:** 2026-07-14 UTC
-**Version:** 1.0.0
+**Last audit:** 2026-07-18 UTC
+**Version:** 1.1.0
 
 ## Exceptional Checklist
 
 - [x] **README hooks reader in first 3 lines** — "Zero-Dependency Retry Mechanism Library" with clear value prop.
 - [x] **Quick start works in <2 minutes** — `npm install` + `import { retry }` works. Build via `npm run build`, tests via `npm test`.
-- [x] **All tests GREEN (100% pass rate)** — 37/37 tests passing across 4 suites (basic, error-handling, monitoring, timeout).
-- [x] **Test coverage >= 80% on core logic** — Tests cover all retry strategies (fixed, exponential, linear, fibonacci), jitter, maxDelay, timeout, error handling, and monitoring.
+- [x] **All tests GREEN (100% pass rate)** — 73/73 tests passing across 5 suites (basic, edge-cases, error-handling, monitoring, timeout). Zero cancellations.
+- [x] **Test coverage >= 80% on core logic** — Lines 97.68%, branches 86.22%, functions 99.57%. Core index.js: 100% lines, 98.28% branches.
 - [x] **Zero TypeScript errors (strict mode)** — Production code compiles cleanly. Tests compile to dist/tests/ and run via node --test.
 - [x] **Zero ESLint warnings** — Zero-dep TypeScript project, tsc is the gate.
 - [x] **No TODO/FIXME comments in shipped code** — Verified: grep returns empty.
@@ -25,3 +25,4 @@
 
 - 2026-06-27: Initial audit — tests broken (TypeScript compilation issues)
 - 2026-07-14: Re-audit — all 37 tests GREEN. Tests fixed in prior cycles. STATUS.md updated.
+- 2026-07-18: Re-audit — fixed test hanging (reduced delays 500-2000ms → 10-50ms, added timer .unref(), set 10s test timeout). 73/73 tests GREEN (was 65 pass + 3 cancelled). Coverage: lines 97.68%, branches 86.22%, funcs 99.57%.
