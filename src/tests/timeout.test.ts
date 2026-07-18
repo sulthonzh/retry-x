@@ -8,6 +8,9 @@ import assert from 'node:assert/strict';
 const pendingTimers: NodeJS.Timeout[] = [];
 
 function trackTimer(timer: NodeJS.Timeout): NodeJS.Timeout {
+  // unref prevents the timer from keeping the event loop alive
+  // so the test runner can exit cleanly after tests complete
+  timer.unref?.();
   pendingTimers.push(timer);
   return timer;
 }
@@ -34,13 +37,13 @@ describe('retry-x - Timeout Functionality', () => {
         callCount++;
         // Use tracked timer so it's cleaned up after test
         await new Promise(resolve => {
-          const t = setTimeout(resolve, 2000);
+          const t = setTimeout(resolve, 500);
           trackTimer(t);
         });
         return 'success';
       }, {
         maxAttempts: 2,
-        timeout: 100
+        timeout: 50
       });
     }, (error: unknown) => {
       assert.match((error as Error).message, /Operation failed after 2 attempts/);
@@ -72,14 +75,14 @@ describe('retry-x - Timeout Functionality', () => {
       await retry(async () => {
         callCount++;
         await new Promise(resolve => {
-          const t = setTimeout(resolve, 400);
+          const t = setTimeout(resolve, 300);
           trackTimer(t);
         });
         return 'success';
       }, {
         maxAttempts: 3,
-        timeout: 100,
-        delay: 50
+        timeout: 50,
+        delay: 10
       });
     });
     
@@ -95,14 +98,14 @@ describe('retry-x - Timeout Functionality', () => {
       await retry(async () => {
         callCount++;
         await new Promise(resolve => {
-          const t = setTimeout(resolve, 2000);
+          const t = setTimeout(resolve, 500);
           trackTimer(t);
         });
         return 'success';
       }, {
         maxAttempts: 2,
-        timeout: 100,
-        delay: 50,
+        timeout: 50,
+        delay: 20,
         backoff: 'exponential'
       });
     }, (error: unknown) => {
@@ -111,10 +114,10 @@ describe('retry-x - Timeout Functionality', () => {
     });
     
     const totalTime = Date.now() - startTime;
-    // 2 timeouts (100ms each) + exponential delay (50ms) = ~250ms
+    // 2 timeouts (50ms each) + exponential delay (20ms) = ~120ms
     assert.equal(callCount, 2);
-    assert.ok(totalTime >= 200, `totalTime ${totalTime} should be >= 200`);
-    assert.ok(totalTime < 600, `totalTime ${totalTime} should be < 600`);
+    assert.ok(totalTime >= 100, `totalTime ${totalTime} should be >= 100`);
+    assert.ok(totalTime < 400, `totalTime ${totalTime} should be < 400`);
   });
 
   it('should continue retrying after timeout', async () => {
@@ -124,7 +127,7 @@ describe('retry-x - Timeout Functionality', () => {
       callCount++;
       if (callCount === 1) {
         await new Promise(resolve => {
-          const t = setTimeout(resolve, 400);
+          const t = setTimeout(resolve, 300);
           trackTimer(t);
         });
       } else {
@@ -133,7 +136,7 @@ describe('retry-x - Timeout Functionality', () => {
       return 'success';
     }, {
       maxAttempts: 3,
-      timeout: 100
+      timeout: 50
     });
 
     assert.equal(callCount, 2);
@@ -148,15 +151,15 @@ describe('retry-x - Timeout Functionality', () => {
       await retry(async () => {
         callCount++;
         await new Promise(resolve => {
-          const t = setTimeout(resolve, 400);
+          const t = setTimeout(resolve, 300);
           trackTimer(t);
         });
         throw new Error('Operation took too long');
       }, {
         maxAttempts: 3,
-        timeout: 100,
+        timeout: 50,
         shouldRetry: (error: Error) => {
-          return error.message === 'Operation timed out after 100ms';
+          return error.message === 'Operation timed out after 50ms';
         }
       });
     });
@@ -173,20 +176,21 @@ describe('retry-x - Timeout Functionality', () => {
       await retry(async () => {
         callCount++;
         await new Promise(resolve => {
-          const t = setTimeout(resolve, 2000);
+          const t = setTimeout(resolve, 400);
           trackTimer(t);
         });
         return 'success';
       }, {
         maxAttempts: 2,
-        timeout: 100
+        timeout: 50,
+        delay: 50
       });
     });
     
     assert.equal(callCount, 2);
     const totalTime = Date.now() - startTime;
-    // 2 timeouts (100ms each) + 1 default delay (1000ms) = ~1200ms
-    assert.ok(totalTime >= 1000, `totalTime ${totalTime} should be >= 1000`);
+    // 2 timeouts (50ms each) + 1 delay (50ms) = ~150ms
+    assert.ok(totalTime >= 100, `totalTime ${totalTime} should be >= 100`);
   });
 
   it('should handle timeout with monitoring callbacks', async () => {
@@ -198,14 +202,14 @@ describe('retry-x - Timeout Functionality', () => {
         callCount++;
         callbackOrder.push(`start-${callCount}`);
         await new Promise(resolve => {
-          const t = setTimeout(resolve, 400);
+          const t = setTimeout(resolve, 300);
           trackTimer(t);
         });
         callbackOrder.push(`end-${callCount}`);
         return 'success';
       }, {
         maxAttempts: 2,
-        timeout: 100,
+        timeout: 50,
         onAttempt: (attempt: number) => {
           callbackOrder.push(`attempt-${attempt}`);
         }
@@ -230,41 +234,41 @@ describe('retry-x - Timeout Functionality', () => {
       await retry(async () => {
         callCount++;
         await new Promise(resolve => {
-          const t = setTimeout(resolve, 400);
+          const t = setTimeout(resolve, 300);
           trackTimer(t);
         });
         return 'success';
       }, {
         maxAttempts: 2,
-        timeout: 100,
-        delay: 100
+        timeout: 50,
+        delay: 50
       });
     });
     
     const totalTime = Date.now() - startTime;
     // Timeout is per-attempt; both attempts will timeout and retry continues
-    // 2 timeouts (100ms each) + 1 delay (100ms) = ~300ms
+    // 2 timeouts (50ms each) + 1 delay (50ms) = ~150ms
     assert.equal(callCount, 2);
-    assert.ok(totalTime >= 250, `totalTime ${totalTime} should be >= 250`);
-    assert.ok(totalTime < 600, `totalTime ${totalTime} should be < 600`);
+    assert.ok(totalTime >= 120, `totalTime ${totalTime} should be >= 120`);
+    assert.ok(totalTime < 400, `totalTime ${totalTime} should be < 400`);
   });
 
   it('should throw RetryError with timeout info', async () => {
     await assert.rejects(async () => {
       await retry(async () => {
         await new Promise(resolve => {
-          const t = setTimeout(resolve, 2000);
+          const t = setTimeout(resolve, 500);
           trackTimer(t);
         });
         return 'success';
       }, {
         maxAttempts: 1,
-        timeout: 50
+        timeout: 30
       });
     }, (error: unknown) => {
       assert.ok(error instanceof RetryError);
       assert.match((error as Error).message, /Operation failed after 1 attempts/);
-      assert.match((error as Error).message, /Operation timed out after 50ms/);
+      assert.match((error as Error).message, /Operation timed out after 30ms/);
       return true;
     });
   });

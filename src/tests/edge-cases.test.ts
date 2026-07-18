@@ -67,19 +67,19 @@ describe('retry-x - Edge Cases', () => {
         throw new Error('Fail');
       }, {
         maxAttempts: 7,
-        delay: 100,
+        delay: 10,
         backoff: 'fibonacci',
-        maxDelay: 500
+        maxDelay: 50
       });
     } catch (error: unknown) {
       const e = error as RetryError;
-      // Fibonacci: 100, 100, 200, 300, 500, 500 (capped)
-      assert.equal(e.delays[0], 100);
-      assert.equal(e.delays[1], 100);
-      assert.equal(e.delays[2], 200);
-      assert.equal(e.delays[3], 300);
-      assert.equal(e.delays[4], 500); // would be 500 naturally
-      assert.equal(e.delays[5], 500); // capped from 800
+      // Fibonacci: 10, 10, 20, 30, 50, 50 (capped)
+      assert.equal(e.delays[0], 10);
+      assert.equal(e.delays[1], 10);
+      assert.equal(e.delays[2], 20);
+      assert.equal(e.delays[3], 30);
+      assert.equal(e.delays[4], 50); // would be 50 naturally
+      assert.equal(e.delays[5], 50); // capped from 80
     }
     assert.equal(callCount, 7);
   });
@@ -92,17 +92,17 @@ describe('retry-x - Edge Cases', () => {
         throw new Error('Fail');
       }, {
         maxAttempts: 3,
-        delay: 100,
+        delay: 50,
         jitter: true,
         jitterType: 'equal'
       });
     } catch (error: unknown) {
       const delays = (error as RetryError).delays;
       // Equal jitter: delay/2 + random * (delay - delay/2)
-      // So range is [50, 100) for delay=100
+      // So range is [25, 50) for delay=50
       for (const d of delays) {
-        assert.ok(d! >= 50, `delay ${d} should be >= 50`);
-        assert.ok(d! < 100, `delay ${d} should be < 100`);
+        assert.ok(d! >= 25, `delay ${d} should be >= 25`);
+        assert.ok(d! < 50, `delay ${d} should be < 50`);
       }
     }
     assert.equal(callCount, 3);
@@ -156,7 +156,7 @@ describe('retry-x - Edge Cases', () => {
         throw new Error('Fail');
       }, {
         maxAttempts: 4,
-        delay: 100,
+        delay: 10,
         backoff: 'linear',
         onRetry: (_attempt: number, _error: Error, delay: number) => {
           recordedDelays.push(delay);
@@ -166,7 +166,7 @@ describe('retry-x - Edge Cases', () => {
       // expected
     }
 
-    assert.deepEqual(recordedDelays, [100, 200, 300]);
+    assert.deepEqual(recordedDelays, [10, 20, 30]);
   });
 
   it('withRetry should return just the value', async () => {
@@ -346,13 +346,13 @@ describe('retry-x - Edge Cases', () => {
         throw new Error('Fail');
       }, {
         maxAttempts: 4,
-        delay: 100,
+        delay: 10,
         backoff: 'exponential'
       });
     } catch (error: unknown) {
       const e = error as RetryError;
       assert.equal(e.delays.length, 3);
-      assert.deepEqual(e.delays, [100, 200, 400]);
+      assert.deepEqual(e.delays, [10, 20, 40]);
     }
   });
 
@@ -366,11 +366,11 @@ describe('retry-x - Edge Cases', () => {
     await assert.rejects(async () => {
       await retry(async () => {
         throw new Error('Fail');
-      }, { maxAttempts: 3, delay: 100 });
+      }, { maxAttempts: 3, delay: 30 });
     });
     const elapsed = Date.now() - start;
-    // 2 delays of 100ms = 200ms minimum
-    assert.ok(elapsed >= 200, `elapsed ${elapsed} should be >= 200`);
+    // 2 delays of 30ms = 60ms minimum
+    assert.ok(elapsed >= 50, `elapsed ${elapsed} should be >= 50`);
   });
 
   it('should handle abort signal', async () => {

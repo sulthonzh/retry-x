@@ -20,7 +20,7 @@ describe('retry-x - Error Handling', () => {
     await assert.rejects(async () => {
       await retry(async () => {
         throw new Error('Custom error message');
-      }, { maxAttempts: 2 });
+      }, { maxAttempts: 2, delay: 10 });
     }, (error: unknown) => {
       assert.ok(error instanceof RetryError);
       assert.match((error as Error).message, /Custom error message/);
@@ -36,6 +36,7 @@ describe('retry-x - Error Handling', () => {
         throw new Error('Specific failure');
       }, {
         maxAttempts: 2,
+        delay: 10,
         onFailure: (error: Error) => {
           failureError = error;
         }
@@ -97,7 +98,7 @@ describe('retry-x - Error Handling', () => {
       await retry(async () => {
         callCount++;
         throw new Error(`Attempt ${callCount}`);
-      }, { maxAttempts: 4 });
+      }, { maxAttempts: 4, delay: 10 });
     }, (error: unknown) => {
       assert.ok(error instanceof RetryError);
       assert.equal((error as RetryError).attempt, 4);

@@ -16,6 +16,7 @@ describe('retry-x - Monitoring and Callbacks', () => {
       return 'success';
     }, {
       maxAttempts: 3,
+      delay: 10,
       onAttempt: (attempt: number) => {
         attemptCalls.push(attempt);
       }
@@ -36,6 +37,7 @@ describe('retry-x - Monitoring and Callbacks', () => {
         throw new Error(`Attempt ${callCount} failed`);
       }, {
         maxAttempts: 3,
+        delay: 10,
         onAttempt: (attempt: number, error?: Error) => {
           if (error) {
             attemptCalls.push({ attempt, error });
@@ -71,7 +73,7 @@ describe('retry-x - Monitoring and Callbacks', () => {
       return 'success';
     }, {
       maxAttempts: 3,
-      delay: 500,
+      delay: 50,
       onRetry: (attempt: number, error: Error, delay: number) => {
         retryCalls.push({ attempt, error, delay });
       }
@@ -79,7 +81,7 @@ describe('retry-x - Monitoring and Callbacks', () => {
 
     assert.equal(retryCalls.length, 1);
     assert.equal(retryCalls[0]!.attempt, 2);
-    assert.equal(retryCalls[0]!.delay, 500);
+    assert.equal(retryCalls[0]!.delay, 50);
     assert.equal(retryCalls[0]!.error.message, 'First attempt failed');
     assert.equal(result.value, 'success');
   });
@@ -96,6 +98,7 @@ describe('retry-x - Monitoring and Callbacks', () => {
       return { data: 'success' };
     }, {
       maxAttempts: 3,
+      delay: 10,
       onSuccess: (result: unknown, attempts: number, totalTime: number) => {
         successCalls.push({ result, attempts, totalTime });
       }
@@ -118,6 +121,7 @@ describe('retry-x - Monitoring and Callbacks', () => {
         throw new Error('Always fails');
       }, {
         maxAttempts: 3,
+        delay: 10,
         onFailure: (error: Error, attempts: number, totalTime: number) => {
           failureCalls.push({ error, attempts, totalTime });
         }
@@ -145,7 +149,7 @@ describe('retry-x - Monitoring and Callbacks', () => {
       return 'success';
     }, {
       maxAttempts: 3,
-      delay: 100,
+      delay: 10,
       onAttempt: (attempt: number) => {
         callbackOrder.push(`attempt-${attempt}`);
       },
@@ -174,7 +178,7 @@ describe('retry-x - Monitoring and Callbacks', () => {
       return 'success';
     }, {
       maxAttempts: 2,
-      delay: 200,
+      delay: 50,
       onAttempt: (attempt: number) => {
         timingCallbacks.push({
           type: `attempt-${attempt}`,
@@ -191,9 +195,9 @@ describe('retry-x - Monitoring and Callbacks', () => {
 
     assert.ok(timingCallbacks.length > 0);
     // First attempt should be near 0ms
-    assert.ok(timingCallbacks[0]!.time < 50, `First attempt time ${timingCallbacks[0]!.time} should be < 50`);
-    // Success time should be > 150ms due to retry delay
-    assert.ok(timingCallbacks[1]!.time > 150, `Success time ${timingCallbacks[1]!.time} should be > 150`);
+    assert.ok(timingCallbacks[0]!.time < 30, `First attempt time ${timingCallbacks[0]!.time} should be < 30`);
+    // Success time should be > 40ms due to retry delay
+    assert.ok(timingCallbacks[1]!.time > 40, `Success time ${timingCallbacks[1]!.time} should be > 40`);
   });
 
   it('should handle callback errors gracefully', async () => {
@@ -207,6 +211,7 @@ describe('retry-x - Monitoring and Callbacks', () => {
       return 'success';
     }, {
       maxAttempts: 2,
+      delay: 10,
       onAttempt: () => {
         throw new Error('Callback error');
       }
@@ -225,7 +230,7 @@ describe('retry-x - Monitoring and Callbacks', () => {
         throw new Error('First attempt failed');
       }
       return 'success';
-    });
+    }, { delay: 10 });
 
     assert.equal(callCount, 2);
     assert.equal(result.value, 'success');

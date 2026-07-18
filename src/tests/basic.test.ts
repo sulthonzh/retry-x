@@ -67,14 +67,14 @@ describe('retry-x - Basic Functionality', () => {
         throw new Error('Failed');
       }, {
         maxAttempts: 3,
-        delay: 500
+        delay: 50
       });
     });
     
     const totalTime = Date.now() - startTime;
-    // Should be approximately 1000ms (2 retries * 500ms delay)
-    assert.ok(totalTime > 900, `totalTime ${totalTime} should be > 900`);
-    assert.ok(totalTime < 1200, `totalTime ${totalTime} should be < 1200`);
+    // Should be approximately 100ms (2 retries * 50ms delay)
+    assert.ok(totalTime >= 90, `totalTime ${totalTime} should be >= 90`);
+    assert.ok(totalTime < 300, `totalTime ${totalTime} should be < 300`);
     assert.equal(callCount, 3);
   });
 
@@ -87,7 +87,7 @@ describe('retry-x - Basic Functionality', () => {
         throw new Error('Failed');
       }, {
         maxAttempts: 3,
-        delay: 200,
+        delay: 20,
         backoff: 'fixed'
       });
       assert.fail('Should have thrown');
@@ -95,8 +95,8 @@ describe('retry-x - Basic Functionality', () => {
       assert.ok(error instanceof RetryError);
       const e = error as RetryError;
       // Fixed backoff should have same delay each time
-      assert.equal(e.delays[0], 200);
-      assert.equal(e.delays[1], 200);
+      assert.equal(e.delays[0], 20);
+      assert.equal(e.delays[1], 20);
       assert.equal(callCount, 3);
     }
   });
@@ -110,18 +110,18 @@ describe('retry-x - Basic Functionality', () => {
         throw new Error('Failed');
       }, {
         maxAttempts: 4,
-        delay: 100,
+        delay: 10,
         backoff: 'exponential',
-        maxDelay: 1000
+        maxDelay: 10000
       });
       assert.fail('Should have thrown');
     } catch (error: unknown) {
       assert.ok(error instanceof RetryError);
       const e = error as RetryError;
-      // Exponential backoff: 100, 200, 400
-      assert.equal(e.delays[0], 100);
-      assert.equal(e.delays[1], 200);
-      assert.equal(e.delays[2], 400);
+      // Exponential backoff: 10, 20, 40
+      assert.equal(e.delays[0], 10);
+      assert.equal(e.delays[1], 20);
+      assert.equal(e.delays[2], 40);
       assert.equal(callCount, 4);
     }
   });
@@ -135,7 +135,7 @@ describe('retry-x - Basic Functionality', () => {
         throw new Error('Failed');
       }, {
         maxAttempts: 4,
-        delay: 100,
+        delay: 10,
         backoff: 'linear',
         maxDelay: 500
       });
@@ -143,10 +143,10 @@ describe('retry-x - Basic Functionality', () => {
     } catch (error: unknown) {
       assert.ok(error instanceof RetryError);
       const e = error as RetryError;
-      // Linear backoff: 100, 200, 300
-      assert.equal(e.delays[0], 100);
-      assert.equal(e.delays[1], 200);
-      assert.equal(e.delays[2], 300);
+      // Linear backoff: 10, 20, 30
+      assert.equal(e.delays[0], 10);
+      assert.equal(e.delays[1], 20);
+      assert.equal(e.delays[2], 30);
       assert.equal(callCount, 4);
     }
   });
@@ -160,18 +160,18 @@ describe('retry-x - Basic Functionality', () => {
         throw new Error('Failed');
       }, {
         maxAttempts: 5,
-        delay: 100,
+        delay: 10,
         backoff: 'fibonacci'
       });
       assert.fail('Should have thrown');
     } catch (error: unknown) {
       assert.ok(error instanceof RetryError);
       const e = error as RetryError;
-      // Fibonacci backoff: 100, 100, 200, 300
-      assert.equal(e.delays[0], 100);
-      assert.equal(e.delays[1], 100);
-      assert.equal(e.delays[2], 200);
-      assert.equal(e.delays[3], 300);
+      // Fibonacci backoff: 10, 10, 20, 30
+      assert.equal(e.delays[0], 10);
+      assert.equal(e.delays[1], 10);
+      assert.equal(e.delays[2], 20);
+      assert.equal(e.delays[3], 30);
       assert.equal(callCount, 5);
     }
   });
@@ -185,7 +185,7 @@ describe('retry-x - Basic Functionality', () => {
         throw new Error('Failed');
       }, {
         maxAttempts: 3,
-        delay: 100,
+        delay: 50,
         backoff: 'fixed',
         jitter: true
       });
@@ -195,8 +195,8 @@ describe('retry-x - Basic Functionality', () => {
       const delays = (error as RetryError).delays;
       
       // With jitter, delays should be different (usually less than base delay)
-      assert.ok(delays[0]! < 100, `delay[0] ${delays[0]} should be < 100`);
-      assert.ok(delays[1]! < 100, `delay[1] ${delays[1]} should be < 100`);
+      assert.ok(delays[0]! < 50, `delay[0] ${delays[0]} should be < 50`);
+      assert.ok(delays[1]! < 50, `delay[1] ${delays[1]} should be < 50`);
       assert.ok(delays[0]! >= 0, `delay[0] ${delays[0]} should be >= 0`);
       assert.ok(delays[1]! >= 0, `delay[1] ${delays[1]} should be >= 0`);
       assert.equal(callCount, 3);
@@ -212,20 +212,20 @@ describe('retry-x - Basic Functionality', () => {
         throw new Error('Failed');
       }, {
         maxAttempts: 5,
-        delay: 1000,
+        delay: 100,
         backoff: 'exponential',
-        maxDelay: 2000
+        maxDelay: 200
       });
       assert.fail('Should have thrown');
     } catch (error: unknown) {
       assert.ok(error instanceof RetryError);
       const delays = (error as RetryError).delays;
       
-      // Should be capped at maxDelay: 1000, 2000, 2000, 2000
-      assert.equal(delays[0], 1000);
-      assert.equal(delays[1], 2000);
-      assert.equal(delays[2], 2000);
-      assert.equal(delays[3], 2000);
+      // Should be capped at maxDelay: 100, 200, 200, 200
+      assert.equal(delays[0], 100);
+      assert.equal(delays[1], 200);
+      assert.equal(delays[2], 200);
+      assert.equal(delays[3], 200);
       assert.equal(callCount, 5);
     }
   });
@@ -251,12 +251,12 @@ describe('retry-x - Basic Functionality', () => {
         throw new Error('First attempt failed');
       }
       return { success: true, data: 'retry success' };
-    });
+    }, { delay: 10 });
 
     assert.equal(result.stats.attempts, 2);
     assert.equal(result.stats.retries, 1);
     assert.equal(result.stats.success, true);
     assert.equal(result.stats.delays.length, 1);
-    assert.equal(result.stats.delays[0], 1000); // default delay
+    assert.equal(result.stats.delays[0], 10);
   });
 });

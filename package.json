@@ -14,7 +14,7 @@
     "clean": "rm -rf dist/",
     "compile": "tsc",
     "pretest": "npm run build",
-    "test": "node --test dist/tests/*.test.js",
+    "test": "node --test --test-timeout=10000 dist/tests/*.test.js",
     "prepublishOnly": "npm run build",
     "dev": "tsc --watch"
   },
