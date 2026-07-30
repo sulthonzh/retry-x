@@ -53,16 +53,18 @@ program
                 throw new Error('Always fails');
             };
             break;
-        case 'network':
+        case 'network': {
+            let networkAttempt = 0;
             testFn = async () => {
                 console.log('🌐 Simulating network operation with intermittent failures');
-                const attemptNum = retryOptions.onAttempt ? retryOptions.onAttempt.length + 1 : 1;
-                if (attemptNum <= 2) {
+                networkAttempt++;
+                if (networkAttempt <= 2) {
                     throw new Error('Network timeout');
                 }
                 return { success: true, message: 'Network request succeeded' };
             };
             break;
+        }
         case 'timeout':
             testFn = async () => {
                 console.log('⏱️ Simulating slow operation');
@@ -90,10 +92,15 @@ program
     .option('-n, --iterations <number>', 'Number of iterations', '100')
     .option('-a, --attempts <number>', 'Max attempts per retry', '3')
     .option('-d, --delay <number>', 'Delay between attempts in ms', '100')
+    .option('-f, --fail-rate <number>', 'Fail rate 0-1 for simulated failures (default: 0)', '0')
     .action(async (options) => {
     const { iterations, attempts, delay } = options;
-    console.log(`🏃 Running benchmark: ${iterations} iterations, ${attempts} attempts, ${delay}ms delay`);
+    const failRate = parseFloat(options.failRate);
+    console.log(`🏃 Running benchmark: ${iterations} iterations, ${attempts} attempts, ${delay}ms delay${failRate > 0 ? `, ${failRate * 100}% fail rate` : ''}`);
     const testFn = async () => {
+        if (Math.random() < failRate) {
+            throw new Error('Simulated benchmark failure');
+        }
         return { success: true, timestamp: Date.now() };
     };
     const retryOptions = {
@@ -108,7 +115,14 @@ program
             results.push(result.stats);
         }
         catch (error) {
-            results.push(error.stats);
+            const e = error;
+            results.push(e.stats || {
+                success: false,
+                attempts: e.attempt || 0,
+                totalTime: 0,
+                retries: Math.max(0, (e.attempt || 0) - 1),
+                delays: e.delays || []
+            });
         }
     }
     const endTime = Date.now();
