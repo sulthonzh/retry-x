@@ -4,4 +4,11 @@ dist/
 *.log
 .DS_Store
 coverage/
-STATUS.mdSTATUS.md
+*.tgz
+__pycache__/
+.venv/
+*.egg-info/
+.mypy_cache/
+STATUS.md
+.env
+.env.*

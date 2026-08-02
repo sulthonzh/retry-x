@@ -1,8 +1,10 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "ES2020",
-    "lib": ["ES2020"],
+    "module": "NodeNext",
+    "lib": [
+      "ES2020"
+    ],
     "declaration": true,
     "outDir": "./dist",
     "rootDir": "./src",
@@ -25,11 +27,16 @@
     "allowUnreachableCode": false,
     "exactOptionalPropertyTypes": true,
     "moduleResolution": "nodenext",
-    "module": "NodeNext",
     "baseUrl": ".",
     "paths": {
-      "*": ["./src/*"]
-    }
+      "*": [
+        "./src/*"
+      ]
+    },
+    "ignoreDeprecations": "6.0",
+    "types": [
+      "node"
+    ]
   },
   "include": [
     "src/**/*"
