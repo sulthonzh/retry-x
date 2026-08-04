@@ -102,7 +102,7 @@ export async function retry<T = any>(
   } = options;
 
   let attempt = 0;
-  let startTime = Date.now();
+  const startTime = Date.now();
   let lastError: Error | undefined;
   const delays: number[] = [];
 

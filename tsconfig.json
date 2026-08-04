@@ -27,12 +27,7 @@
     "allowUnreachableCode": false,
     "exactOptionalPropertyTypes": true,
     "moduleResolution": "nodenext",
-    "baseUrl": ".",
-    "paths": {
-      "*": [
-        "./src/*"
-      ]
-    },
+    "ignoreDeprecations": "6.0",
     "types": [
       "node"
     ]

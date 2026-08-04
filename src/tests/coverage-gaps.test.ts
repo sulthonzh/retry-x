@@ -216,7 +216,7 @@ describe('retry-x - CLI', () => {
   });
 
   it('no command should show help', () => {
-    const { stdout, stderr, exitCode } = runCLI();
+    const { stdout, stderr } = runCLI();
     // commander outputs help to stderr when no command given
     const output = stdout + stderr;
     assert.match(output, /retry-x/);
